@@ -13,10 +13,10 @@ using RedUtils.Math;
 namespace Bot
 {
     // Your bot class! :D
-    public class RedBot : RUBot
+    public class MangoBot : RUBot
     {
         // We want the constructor for our Bot to extend from RUBot, but feel free to add some other initialization in here as well.
-        public RedBot(string botName, int botTeam, int botIndex) : base(botName, botTeam, botIndex) { }
+        public MangoBot(string botName, int botTeam, int botIndex) : base(botName, botTeam, botIndex) { }
 
         // Runs every tick. Should be used to find an Action to execute
         public override void Run()
@@ -30,15 +30,24 @@ namespace Bot
                 foreach (Car teammate in Teammates)
                 {
                     // if any teammates are closer to the ball, then don't go for kickoff
-                    goingForKickoff = goingForKickoff && Me.Location.Dist(Ball.Location) <= teammate.Location.Dist(Ball.Location);
+                    float myDist = Me.Location.Dist(Ball.Location);
+                    float theirDist = teammate.Location.Dist(Ball.Location);
+                    bool isLeft = MathF.Sign(Me.Location.x) != Field.Side(Team);
+
+                    goingForKickoff = goingForKickoff && (myDist < theirDist || myDist == theirDist && isLeft);
                 }
 
                 Action = goingForKickoff ? new Kickoff() : new GetBoost(Me, interruptible: false); // if we aren't going for the kickoff, get boost
             }
-            else if (Action == null || (Action is Drive && Action.Interruptible))
+            else if (Action == null || ((Action is Drive || Action is GetBoost) && Action.Interruptible))
             {
                 // search for the first avaliable shot using DefaultShotCheck
                 Shot shot = FindShot(DefaultShotCheck, new Target(TheirGoal));
+
+                if (Me.Boost < 20 && (shot != null || shot.Slice.Time - Game.Time > 3))
+                {
+                    Action = Action is not GetBoost ? new GetBoost(Me) : Action;
+                }
 
                 // if a shot is found, go for the shot. Otherwise, if there is an Action to execute, execute it. If none of the others apply, drive back to goal.
                 Action = shot ?? Action ?? new Drive(Me, OurGoal.Location);
